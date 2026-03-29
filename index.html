@@ -1,373 +1,235 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monster Generator</title>
 <style>
-:root {
-  --bg: #111214;
-  --panel: #1a1c20;
-  --panel2: #23262b;
-  --text: #f4f4f5;
-  --muted: #b8bcc4;
-  --line: #343842;
-  --accent: #ffffff;
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0; background: var(--bg); color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-.wrap {
-  max-width: 880px; margin: 0 auto; padding: 18px 14px 28px;
-}
-h1 {
-  margin: 0 0 6px; font-size: 28px; line-height: 1.1;
-}
-.sub {
-  color: var(--muted); font-size: 14px; margin-bottom: 16px;
-}
-.controls {
-  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
-}
-button {
-  appearance: none; border: 1px solid var(--line); background: var(--panel2); color: var(--text);
-  padding: 12px 14px; border-radius: 12px; font-size: 16px; font-weight: 600;
-}
-button.primary {
-  background: var(--text); color: #111214; border-color: var(--text);
-}
-.card {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
-  padding: 14px; margin-bottom: 12px;
-}
-.card h2 {
-  margin: 0 0 10px; font-size: 18px;
-}
-.grid {
-  display: grid; grid-template-columns: 1fr; gap: 10px;
-}
-.row {
-  display: grid; grid-template-columns: 140px 1fr; gap: 10px;
-  padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.06);
-}
-.row:first-child { border-top: 0; padding-top: 0; }
-.label { color: var(--muted); font-size: 14px; }
-.value { font-size: 15px; line-height: 1.35; word-break: break-word; }
-.small { color: var(--muted); font-size: 13px; }
-.summary {
-  white-space: pre-wrap; font-size: 14px; line-height: 1.45;
-}
-.footer {
-  color: var(--muted); font-size: 13px; margin-top: 6px;
-}
-.badge {
-  display: inline-block; font-size: 12px; padding: 3px 8px; border-radius: 999px;
-  border: 1px solid var(--line); color: var(--muted); margin-left: 8px;
-}
+body { font-family: -apple-system, sans-serif; padding:20px; background:#f5f5f7; }
+button { padding:16px; font-size:20px; margin:10px 0; border-radius:14px; border:none; background:#111; color:white; }
+pre { white-space:pre-wrap; background:#fff; padding:16px; border-radius:14px; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Monster Generator</h1>
-  <div class="sub">Tap generate to create one valid monster from your full rule set.</div>
 
-  <div class="controls">
-    <button class="primary" id="generateBtn">Generate Monster</button>
-    <button id="copyBtn">Copy Summary</button>
-  </div>
+<h1>Monster Generator</h1>
+<button onclick="generate()">Generate Monster</button>
 
-  <div class="card">
-    <h2>Current Monster <span class="badge" id="seedBadge"></span></h2>
-    <div class="grid" id="monsterGrid"></div>
-  </div>
-
-  <div class="card">
-    <h2>Summary</h2>
-    <div class="summary" id="summaryBox"></div>
-  </div>
-
-  <div class="footer">This generator uses true weighted random selection with rerolls for invalid combinations. It does not use a fixed sample pool.</div>
-</div>
+<pre id="output"></pre>
 
 <script>
-const DATA = {"palettes": {"Sunset": {"background": "54", "body": "66", "variantA": "54", "variantB": "54", "nose": "13", "eyebrows": "15", "tongue": "51", "lips": "15", "horns": ["1", "13"], "tail_wings": ["13", "15", "51"], "head": ["2"], "face": ["15"]}, "Slime": {"background": "P2", "body": "5", "variantA": "2", "variantB": "2", "nose": "6", "eyebrows": "6", "tongue": "48", "lips": "P6", "horns": ["1", "8"], "tail_wings": ["6", "48", "P6", "8"], "head": ["6", "48", "P6", "8"], "face": ["1", "P6", "8"]}, "Dream": {"background": "8", "body": "P11", "variantA": "P6", "variantB": "P6", "nose": "51", "eyebrows": "13", "tongue": "13", "lips": "8", "horns": ["51", "1", "13"], "tail_wings": ["13", "51", "1"], "head": ["1", "13", "51"], "face": ["P6", "1"]}, "Electric": {"background": "9", "body": "8", "variantA": "P2", "variantB": "P2", "nose": "5", "eyebrows": "P2", "tongue": "11", "lips": "13", "horns": ["P2", "1", "13", "5"], "tail_wings": ["P2", "1", "13", "5"], "head": ["5", "1", "13"], "face": ["11", "1"]}, "Candy": {"background": "51", "body": "15", "variantA": "P4", "variantB": "P4", "nose": "3", "eyebrows": "13", "tongue": "66", "lips": "51", "horns": ["13", "1"], "tail_wings": ["66", "13", "15", "1"], "head": ["66", "13", "15", "1"], "face": ["1", "P4"]}, "Ocean": {"background": "8", "body": "48", "variantA": "5", "variantB": "5", "nose": "5", "eyebrows": "P6", "tongue": "66", "lips": "P6", "horns": ["66", "1", "33"], "tail_wings": ["66", "33", "1"], "head": ["1", "66", "33"], "face": ["1", "66", "33"]}, "Sorbet": {"background": "P2", "body": "P4", "variantA": "51", "variantB": "51", "nose": "66", "eyebrows": "13", "tongue": "13", "lips": "51", "horns": ["66", "5", "1"], "tail_wings": ["2", "66", "1", "51"], "head": ["51", "1", "P11"], "face": ["5", "P11", "1"]}, "Bruise": {"background": "37", "body": "12", "variantA": "8", "variantB": "8", "nose": "8", "eyebrows": "33", "tongue": "15", "lips": "14", "horns": ["P11", "8", "15", "1"], "tail_wings": ["P11", "33", "1"], "head": ["33", "8", "15", "1"], "face": ["P11", "15", "1"]}, "Mint": {"background": "6", "body": "5", "variantA": "P6", "variantB": "P6", "nose": "13", "eyebrows": "P6", "tongue": "13", "lips": "51", "horns": ["P6", "1"], "tail_wings": ["13", "P6", "1", "5"], "head": ["P6", "15", "51", "13", "1"], "face": ["1", "51", "8"]}, "Fireball": {"background": "15", "body": "4", "variantA": "2", "variantB": "2", "nose": "15", "eyebrows": "2", "tongue": "51", "lips": "2", "horns": ["1", "4", "13", "2"], "tail_wings": ["2", "1", "13"], "head": ["51", "2", "13"], "face": ["51", "1", "21"]}, "Cotton Candy": {"background": "8", "body": "51", "variantA": "13", "variantB": "13", "nose": "13", "eyebrows": "5", "tongue": "13", "lips": "15", "horns": ["1", "13", "P11"], "tail_wings": ["1", "13", "51"], "head": ["1", "13", "P11"], "face": ["1", "P11"]}, "Toxic": {"background": "24", "body": "5", "variantA": "6", "variantB": "6", "nose": "12", "eyebrows": "6", "tongue": "48", "lips": "P11", "horns": ["8", "6", "1", "P11"], "tail_wings": ["8", "6", "1", "P11"], "head": ["8", "1", "P11"], "face": ["P2", "1"]}, "Berry": {"background": "13", "body": "11", "variantA": "51", "variantB": "51", "nose": "13", "eyebrows": "8", "tongue": "15", "lips": "8", "horns": ["1", "8", "15"], "tail_wings": ["8", "51", "15", "1"], "head": ["8", "51", "15", "1"], "face": ["1", "51", "P11"]}, "Sky": {"background": "48", "body": "8", "variantA": "5", "variantB": "5", "nose": "P4", "eyebrows": "3", "tongue": "51", "lips": "13", "horns": ["1", "13", "51", "P4"], "tail_wings": ["1", "13", "51", "P4", "5"], "head": ["1", "13", "51", "P4"], "face": ["P11", "1"]}, "Garden": {"background": "21", "body": "6", "variantA": "5", "variantB": "5", "nose": "3", "eyebrows": "5", "tongue": "13", "lips": "15", "horns": ["51", "5", "1"], "tail_wings": ["51", "5", "1"], "head": ["51", "5", "1", "3"], "face": ["51", "1", "13"]}, "Highlighter": {"background": "1", "body": "P2", "variantA": "2", "variantB": "2", "nose": "5", "eyebrows": "8", "tongue": "13", "lips": "3", "horns": ["13", "51", "8", "P11", "5"], "tail_wings": ["13", "P11", "8", "5"], "head": ["13", "P11", "8", "5"], "face": ["13", "1", "P11"]}, "Frost": {"background": "48", "body": "33", "variantA": "8", "variantB": "8", "nose": "8", "eyebrows": "5", "tongue": "13", "lips": "15", "horns": ["1", "5", "13", "P11", "51"], "tail_wings": ["1", "5", "13", "P11", "51"], "head": ["1", "5", "13", "P11", "51"], "face": ["1", "13", "P11", "51"]}, "Lava": {"background": "24", "body": "15", "variantA": "P2", "variantB": "P2", "nose": "3", "eyebrows": "11", "tongue": "P2", "lips": "11", "horns": ["P2", "3"], "tail_wings": ["3", "1", "15"], "head": ["3", "1", "15"], "face": ["P2", "1"]}, "Pastel": {"background": "P11", "body": "51", "variantA": "54", "variantB": "54", "nose": "5", "eyebrows": "P6", "tongue": "66", "lips": "P11", "horns": ["P6", "1"], "tail_wings": ["P6", "54", "51", "1"], "head": ["P6", "54", "51", "1"], "face": ["1", "66"]}, "Retro": {"background": "2", "body": "P6", "variantA": "5", "variantB": "5", "nose": "3", "eyebrows": "21", "tongue": "13", "lips": "15", "horns": ["1", "3", "15"], "tail_wings": ["1", "3", "15"], "head": ["1", "3", "15"], "face": ["13", "1", "15"]}, "Vintage": {"background": "21", "body": "2", "variantA": "3", "variantB": "3", "nose": "3", "eyebrows": "21", "tongue": "15", "lips": "66", "horns": ["1", "3", "13"], "tail_wings": ["1", "3", "13"], "head": ["1", "3", "13"], "face": ["15", "1"]}, "Goth": {"background": "24", "body": "1", "variantA": "37", "variantB": "37", "nose": "37", "eyebrows": "24", "tongue": "15", "lips": "14", "horns": ["15", "1", "37"], "tail_wings": ["5", "1", "37"], "head": ["5", "37"], "face": ["37", "15", "14", "24"]}}, "weights": {"palette": {"Sunset": 10, "Slime": 10, "Dream": 10, "Mint": 10, "Candy": 8, "Sorbet": 8, "Cotton Candy": 8, "Frost": 8, "Pastel": 8, "Ocean": 6, "Sky": 6, "Garden": 6, "Retro": 6, "Vintage": 6, "Berry": 4, "Fireball": 4, "Highlighter": 4, "Bruise": 4, "Electric": 2, "Toxic": 2, "Lava": 2, "Goth": 2}, "bodyVariant": {"Solid": 62, "Ombre": 28, "Speckled": 10}, "bodyEdge": {"Straight": 12, "Wavy": 10, "Scalloped": 7, "Zig Zag": 5}, "facePlacement": {"High": 8, "Low": 3}, "eyeType": {"Normal": 15, "Angry": 15, "Bored": 10, "Shifty": 10, "Dots": 6, "Sad": 6, "Cyclops": 3, "3 Eyes": 1}, "eyeTone": {"Normal": 15, "Dark": 10, "Light": 6}, "brows": {"Normal Straight": 15, "Normal Fluffy": 14, "Angry Straight": 10, "Worried Straight": 10, "Straight Unibrow": 8, "Fluffy Unibrow": 7, "Angry Fluffy": 5, "Worried Fluffy": 5, "None": 3, "Brow Ridge / Fold": 3}, "browModifier": {"Standard": 97, "Eleven Lines": 3}, "nose": {"Short": 10, "Long": 10}, "mouth": {"Normal No Lips": 14, "Normal Lips": 14, "Smile No Lips": 10, "Smile Lips": 10, "Frown No Lips": 6, "Frown Lips": 6, "Surprised": 3}, "teeth": {"No Teeth": 14, "Underbite": 12, "Overbite": 12, "Single Tooth Down": 8, "Single Tooth Up": 8, "Buck Teeth": 7, "Fangs Down": 5, "Fangs Up": 5}, "teethModifier": {"None": 90, "Silver": 7, "Gold": 2, "Rainbow": 1}, "tongueTrigger": {"No Tongue": 60, "Tongue": 40}, "tongueType": {"Round Centre": 15, "Round Side": 15, "Round Licking Up": 8, "Forked Centre": 4, "Forked Side": 2}, "cheeks": {"Neutral": 15, "Eye Bags": 10, "Puffy Cheeks": 10, "Freckles": 5}, "horns": {"No Horns": 15, "Small Nubs": 10, "Straight and Pointy": 10, "Curled In": 6, "Curled Out": 6, "Antlers": 3}, "tailWingTrigger": {"None": 70, "Feature": 30}, "tailWingMode": {"Tail Only": 20, "Wings Only": 8, "Both": 2}, "tailType": {"Round Tail": 10, "Fluffy Tail": 10, "Curled Tail": 10, "Arrow Tail": 10}, "wingType": {"Angel Wings": 6, "Bat Wings": 6, "Demon Wings": 6}, "headAccessory": {"None": 20, "Antenna Headband": 10, "Star Headband": 10, "Party Hat": 10, "Tiny Hat": 10, "Hair Bow": 10, "Cat Ears": 6, "Beret": 6, "Witch Hat": 6, "Bunny Ears": 5, "Crown": 3, "Halo": 3, "Arrow Through Head": 2}, "headMetallic": {"None": 90, "Silver": 7, "Gold": 3}, "faceAccessory": {"None": 20, "Bandage": 10, "Stitches": 10, "Drool": 10, "Eyelashes": 7, "Round Glasses": 7, "Wayfarer Glasses": 7, "Wayfarer Sunglasses": 4, "Sweat Drop": 4, "Moustache": 4, "Heart Sunglasses": 2, "Eyepatch": 2, "Monocle": 2, "Circle Hole in Body": 2, "Heart Hole in Body": 1, "Star Hole in Body": 0.5, "Moustache + Monocle": 0.75}, "goldMonocle": {"Normal Monocle": 98, "Gold Monocle": 2}}, "markerLabels": {"1": "White", "2": "Yellow", "3": "Bright Yellow", "4": "Orange", "5": "Light Green", "6": "Green", "7": "Khaki Green", "8": "Light Blue", "9": "Navy Blue", "11": "Fuchsia", "12": "Violet", "13": "Pink", "14": "Dark Red", "15": "Red", "21": "Brown", "22": "Dark Brown", "24": "Black", "25": "Gold", "26": "Silver", "33": "Blue", "37": "Grey", "48": "Sky Blue", "51": "Light Pink", "54": "Light Orange", "66": "Pastel Coral", "P2": "Sunshine Yellow", "P4": "Pastel Apricot", "P6": "Aqua Green", "P11": "Lavender"}};
-
-function weightedChoice(obj) {
-  const entries = Object.entries(obj);
-  const total = entries.reduce((sum, [, w]) => sum + w, 0);
-  let r = Math.random() * total;
-  for (const [item, weight] of entries) {
-    r -= weight;
-    if (r < 0) return item;
+function wPick(list){
+  let total = list.reduce((a,b)=>a+b[1],0);
+  let r = Math.random()*total;
+  for(let i=0;i<list.length;i++){
+    if((r-=list[i][1])<0) return list[i][0];
   }
-  return entries[entries.length - 1][0];
 }
 
-function choice(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length) }
 
-function markerText(code) {
-  if (!code) return "—";
-  return `${code}`;
-}
+function generate(){
 
-function validHeadAccessory(accessory, horns) {
-  if (accessory === "None") return true;
-  if (["Antenna Headband","Star Headband","Party Hat","Tiny Hat","Hair Bow","Witch Hat"].includes(accessory)) {
-    return !["Curled In","Curled Out","Antlers"].includes(horns);
+// =================
+// Twins / Triplets
+// =================
+let twins = Math.random() < 0.02;
+let triplets = !twins && Math.random() < 0.01;
+
+// =================
+// Core
+// =================
+let palette = wPick([
+["Sunset",10],["Slime",10],["Dream",10],["Mint",10],
+["Candy",8],["Sorbet",8],["Cotton Candy",8],["Frost",8],["Pastel",8],
+["Ocean",6],["Sky",6],["Garden",6],["Retro",6],["Vintage",6],
+["Berry",4],["Fireball",4],["Highlighter",4],["Bruise",4],
+["Electric",2],["Toxic",2],["Lava",2],["Goth",2]
+]);
+
+let bodyEdge = wPick([
+["Straight edges",12],["Wavy edges",10],["Scalloped edges",7],["Zig zag edges",5]
+]);
+
+let bodyVariant = wPick([
+["Solid",62],["Ombre",26],["Speckled",12]
+]);
+
+let facePlacement = wPick([["High",8],["Low",3]]);
+
+// =================
+// Face
+// =================
+let eyes = wPick([
+["Normal",15],["Angry",15],["Bored",10],["Shifty",10],
+["Dots",6],["Sad",6],["Cyclops",3],["3 Eyes",1]
+]);
+
+let eyeTone = wPick([["Normal",15],["Dark",8],["Light",4]]);
+
+let brows = wPick([
+["Normal straight",15],["Normal fluffy",14],["Angry straight",10],["Worried straight",10],
+["Straight unibrow",8],["Fluffy unibrow",7],
+["Angry fluffy",5],["Worried fluffy",5],
+["None",3],["Ridge",3]
+]);
+
+let eleven = ["Angry fluffy","Normal fluffy","Worried fluffy"].includes(brows)
+  ? (Math.random()<0.1?"Yes":"No")
+  : "No";
+
+let nose = Math.random()<0.5 ? "Short" : "Long";
+
+let mouth = wPick([
+["Normal no lips",14],["Normal lips",14],["Smile no lips",10],["Smile lips",10],
+["Frown no lips",6],["Frown lips",6],["Surprised",3]
+]);
+
+// =================
+// Teeth
+// =================
+let teeth = wPick([
+["No teeth",14],["Underbite",12],["Overbite",12],
+["Single down",8],["Single up",8],
+["Buck teeth",7],["Fangs down",5],["Fangs up",5]
+]);
+
+let teethMod = "None";
+if(teeth !== "No teeth"){
+  if(teeth==="Underbite"||teeth==="Overbite"){
+    teethMod = wPick([["None",20],["Silver",3],["Gold",2],["Rainbow",1]]);
+  }else{
+    teethMod = wPick([["None",20],["Silver",3],["Gold",2]]);
   }
-  if (accessory === "Cat Ears") return horns === "No Horns";
-  if (accessory === "Bunny Ears") return ["No Horns","Small Nubs"].includes(horns);
-  if (accessory === "Beret") return horns === "No Horns";
-  return true;
 }
 
-function validFaceAccessory(accessory, facePlacement, tonguePresent) {
-  if (accessory === "Sweat Drop") return facePlacement === "Low";
-  if (["Circle Hole in Body","Heart Hole in Body","Star Hole in Body"].includes(accessory)) return facePlacement === "High";
-  if (accessory === "Drool") return !tonguePresent;
-  return true;
-}
+// =================
+// Tongue (with reroll logic)
+// =================
+let tongue = "No tongue";
+if(Math.random()<0.4){
+  let valid = [];
+  let all = ["Centre","Side","Lick","Fork Centre","Fork Side"];
 
-function validTongues(teeth) {
-  const result = [];
-  for (const t of Object.keys(DATA.weights.tongueType)) {
+  for(let t of all){
     let ok = true;
-    if (t === "Round Centre" && ["Underbite","Overbite","Buck Teeth"].includes(teeth)) ok = false;
-    if (t === "Round Side" && ["Underbite","Overbite","Fangs Down","Fangs Up","Buck Teeth"].includes(teeth)) ok = false;
-    if (t === "Round Licking Up" && ["Underbite","Overbite","Fangs Down","Fangs Up","Single Tooth Up","Buck Teeth"].includes(teeth)) ok = false;
-    if (t === "Forked Centre" && ["Underbite","Overbite","Buck Teeth"].includes(teeth)) ok = false;
-    if (t === "Forked Side" && ["Underbite","Overbite","Fangs Down","Fangs Up","Buck Teeth"].includes(teeth)) ok = false;
-    if (ok) result.push(t);
+
+    if(["Underbite","Overbite","Buck teeth"].includes(teeth)) ok=false;
+    if(teeth==="Fangs down" && (t==="Side"||t==="Fork Side")) ok=false;
+    if(teeth==="Fangs up" && (t==="Side"||t==="Fork Side")) ok=false;
+    if(teeth==="Single up" && t==="Lick") ok=false;
+
+    if(ok) valid.push(t);
   }
-  return result;
+
+  if(valid.length>0) tongue = pick(valid);
 }
 
-function validTeethModifierOptions(teeth) {
-  const opts = { "None": 90, "Silver": 7, "Gold": 2 };
-  if (["Underbite", "Overbite"].includes(teeth)) opts["Rainbow"] = 1;
-  return opts;
+// =================
+// Cheeks
+// =================
+let cheeks = wPick([
+["Neutral",15],["Eye bags",10],["Puffy cheeks",10],["Freckles",5]
+]);
+
+// =================
+// Horns
+// =================
+let horns = wPick([
+["None",15],["Nubs",10],["Straight",10],["Curled in",6],["Curled out",6],["Antlers",3]
+]);
+
+// =================
+// Tail / Wings
+// =================
+let tailMode = wPick([
+["None",70],["Tail",20],["Wings",8],["Both",2]
+]);
+
+let tail = "None";
+let wings = "None";
+
+if(tailMode==="Tail"||tailMode==="Both"){
+  tail = pick(["Round","Fluffy","Curled","Arrow"]);
+}
+if(tailMode==="Wings"||tailMode==="Both"){
+  wings = pick(["Angel","Bat","Demon"]);
 }
 
-function validHeadMetallicOptions(accessory) {
-  if (["Star Headband","Antenna Headband","Arrow Through Head"].includes(accessory)) return { "None": 90, "Silver": 7, "Gold": 3 };
-  if (["Crown","Halo"].includes(accessory)) return { "None": 90, "Gold": 3 };
-  return { "None": 1 };
+// =================
+// Head Accessories (with rules)
+// =================
+let head = pick(["None","Antenna","Star","Cat","Bunny","Party","Crown","Arrow","Tiny","Beret","Bow","Halo","Witch"]);
+
+if(["Curled in","Curled out","Antlers"].includes(horns)){
+  if(["Antenna","Star","Tiny","Bow","Witch","Party"].includes(head)) head="None";
+}
+if(horns!=="None" && head==="Cat") head="None";
+if(horns!=="None" && head==="Beret") head="None";
+if(horns!=="None" && head==="Bunny") head="None";
+
+// =================
+// Face Accessories
+// =================
+let faceAcc = pick([
+"None","Bandage","Stitches","Drool","Eyelashes","Round glasses",
+"Wayfarer glasses","Wayfarer sunglasses","Sweat drop",
+"Heart sunglasses","Eyepatch","Monocle",
+"Circle hole","Heart hole","Star hole","Moustache"
+]);
+
+if(tongue!=="No tongue" && faceAcc==="Drool") faceAcc="None";
+if(facePlacement==="Low" && ["Circle hole","Heart hole","Star hole"].includes(faceAcc)) faceAcc="None";
+if(facePlacement==="High" && faceAcc==="Sweat drop") faceAcc="None";
+
+// moustache pairing
+if(faceAcc==="Moustache" && Math.random()<0.2){
+  faceAcc="Moustache + Monocle";
 }
 
-function generateMonster() {
-  const paletteName = weightedChoice(DATA.weights.palette);
-  const palette = DATA.palettes[paletteName];
-
-  const bodyVariant = weightedChoice(DATA.weights.bodyVariant);
-  const bodyEdge = weightedChoice(DATA.weights.bodyEdge);
-  const facePlacement = weightedChoice(DATA.weights.facePlacement);
-  const eyeType = weightedChoice(DATA.weights.eyeType);
-  const eyeTone = weightedChoice(DATA.weights.eyeTone);
-
-  const browType = weightedChoice(DATA.weights.brows);
-  const browModifier = ["Angry Fluffy","Normal Fluffy","Worried Fluffy"].includes(browType)
-    ? weightedChoice(DATA.weights.browModifier)
-    : "Standard";
-
-  const noseType = weightedChoice(DATA.weights.nose);
-  const mouth = weightedChoice(DATA.weights.mouth);
-
-  let teeth = weightedChoice(DATA.weights.teeth);
-  const tongueTrigger = weightedChoice(DATA.weights.tongueTrigger);
-  let tongue = "No Tongue";
-  if (tongueTrigger === "Tongue") {
-    while (validTongues(teeth).length === 0) {
-      teeth = weightedChoice(DATA.weights.teeth);
-    }
-    const eligibleTongues = validTongues(teeth);
-    const tongueWeights = Object.fromEntries(
-      Object.entries(DATA.weights.tongueType).filter(([k]) => eligibleTongues.includes(k))
-    );
-    tongue = weightedChoice(tongueWeights);
-  }
-  const teethModifier = weightedChoice(validTeethModifierOptions(teeth));
-
-  const cheeks = weightedChoice(DATA.weights.cheeks);
-  const horns = weightedChoice(DATA.weights.horns);
-
-  let tail = null;
-  let wings = null;
-  const tailWingTrigger = weightedChoice(DATA.weights.tailWingTrigger);
-  if (tailWingTrigger === "Feature") {
-    const mode = weightedChoice(DATA.weights.tailWingMode);
-    if (mode === "Tail Only") {
-      tail = weightedChoice(DATA.weights.tailType);
-    } else if (mode === "Wings Only") {
-      wings = weightedChoice(DATA.weights.wingType);
-    } else {
-      tail = weightedChoice(DATA.weights.tailType);
-      wings = weightedChoice(DATA.weights.wingType);
-    }
-  }
-
-  let headAccessory = "None";
-  do {
-    headAccessory = weightedChoice(DATA.weights.headAccessory);
-  } while (!validHeadAccessory(headAccessory, horns));
-
-  const headMetallic = headAccessory === "None" ? "None" : weightedChoice(validHeadMetallicOptions(headAccessory));
-
-  const tonguePresent = tongue !== "No Tongue";
-  let faceAccessory = "None";
-  do {
-    faceAccessory = weightedChoice(DATA.weights.faceAccessory);
-  } while (!validFaceAccessory(faceAccessory, facePlacement, tonguePresent));
-
-  let goldMonocle = false;
-  if ((faceAccessory === "Monocle" || faceAccessory === "Moustache + Monocle") &&
-      (faceAccessory.includes("Moustache") || (headAccessory === "Crown" && headMetallic === "Gold"))) {
-    goldMonocle = weightedChoice(DATA.weights.goldMonocle) === "Gold Monocle";
-  }
-
-  let bodyVariantDetail = "";
-  if (bodyVariant === "Solid") bodyVariantDetail = `${palette.body} solid`;
-  if (bodyVariant === "Ombre") bodyVariantDetail = `${palette.body} ombre into ${palette.variantA}`;
-  if (bodyVariant === "Speckled") bodyVariantDetail = `${palette.body} with dots in ${palette.variantB}`;
-
-  const hornColor = horns !== "No Horns" ? choice(palette.horns) : null;
-  const tailColor = tail ? choice(palette.tail_wings) : null;
-  const wingColor = wings ? choice(palette.tail_wings) : null;
-
-  let headAccessoryColor = null;
-  if (headAccessory !== "None") {
-    if (headMetallic === "Gold") headAccessoryColor = "25";
-    else if (headMetallic === "Silver") headAccessoryColor = "26";
-    else headAccessoryColor = choice(palette.head);
-  }
-
-  let faceAccessoryColor = null;
-  let faceAccessoryLabel = faceAccessory;
-
-  if (faceAccessory === "Monocle") {
-    faceAccessoryLabel = goldMonocle ? "Gold Monocle" : "Monocle";
-    faceAccessoryColor = goldMonocle ? "25" : choice(palette.face);
-  } else if (faceAccessory === "Moustache + Monocle") {
-    const moustacheColor = choice(palette.face);
-    const monocleColor = goldMonocle ? "25" : choice(palette.face);
-    faceAccessoryLabel = goldMonocle ? "Moustache + Gold Monocle" : "Moustache + Monocle";
-    faceAccessoryColor = `Moustache ${moustacheColor} / Monocle ${monocleColor}`;
-  } else if (faceAccessory !== "None") {
-    faceAccessoryColor = choice(palette.face);
-  }
-
-  return {
-    seed: Math.floor(Math.random() * 1000000000),
-    paletteName,
-    background: palette.background,
-    body: palette.body,
-    bodyVariant,
-    bodyVariantDetail,
-    bodyEdge,
-    facePlacement,
-    eyeType,
-    eyeTone,
-    noseType,
-    noseColor: palette.nose,
-    browType: browType + (browModifier === "Eleven Lines" ? " + Eleven Lines" : ""),
-    browColor: palette.eyebrows,
-    mouth,
-    lipsColor: mouth.includes("Lips") ? palette.lips : null,
-    teeth,
-    teethModifier,
-    tongue,
-    tongueColor: tongue !== "No Tongue" ? palette.tongue : null,
-    cheeks,
-    horns,
-    hornColor,
-    tail,
-    tailColor,
-    wings,
-    wingColor,
-    headAccessory,
-    headMetallic,
-    headAccessoryColor,
-    faceAccessory: faceAccessoryLabel,
-    faceAccessoryColor
-  };
+// =================
+// Gold monocle override
+// =================
+let goldMono = "No";
+if(
+  (faceAcc==="Monocle" || faceAcc==="Moustache + Monocle") &&
+  (faceAcc==="Moustache + Monocle" || head==="Crown")
+){
+  if(Math.random()<0.05) goldMono="Yes";
 }
 
-function renderMonster(mon) {
-  document.getElementById("seedBadge").textContent = `#${mon.seed}`;
+// =================
+// OUTPUT
+// =================
+document.getElementById("output").textContent = `
+Twins: ${twins?"Yes":"No"}
+Triplets: ${triplets?"Yes":"No"}
 
-  const rows = [
-    ["Palette", mon.paletteName],
-    ["Background", markerText(mon.background)],
-    ["Body", `${markerText(mon.body)} · ${mon.bodyVariantDetail}`],
-    ["Body Edge", mon.bodyEdge],
-    ["Face Placement", mon.facePlacement],
-    ["Eyes", `${mon.eyeType} · ${mon.eyeTone} tone`],
-    ["Eyebrows", `${mon.browType} · color ${markerText(mon.browColor)}`],
-    ["Nose", `${mon.noseType} · color ${markerText(mon.noseColor)}`],
-    ["Mouth", mon.mouth + (mon.lipsColor ? ` · lips ${markerText(mon.lipsColor)}` : "")],
-    ["Teeth", mon.teeth + (mon.teethModifier !== "None" ? ` · ${mon.teethModifier}` : "")],
-    ["Tongue", mon.tongue + (mon.tongueColor ? ` · color ${markerText(mon.tongueColor)}` : "")],
-    ["Cheek Area", mon.cheeks],
-    ["Horns", mon.horns + (mon.hornColor ? ` · color ${markerText(mon.hornColor)}` : "")],
-    ["Tail", mon.tail ? `${mon.tail} · color ${markerText(mon.tailColor)}` : "None"],
-    ["Wings", mon.wings ? `${mon.wings} · color ${markerText(mon.wingColor)}` : "None"],
-    ["Head Accessory", mon.headAccessory === "None" ? "None" :
-      mon.headAccessory + (mon.headMetallic !== "None" ? ` · ${mon.headMetallic}` : "") +
-      (mon.headAccessoryColor ? ` · color ${markerText(mon.headAccessoryColor)}` : "")],
-    ["Face Accessory", mon.faceAccessory === "None" ? "None" :
-      mon.faceAccessory + (mon.faceAccessoryColor ? ` · color ${markerText(mon.faceAccessoryColor)}` : "")]
-  ];
+Palette: ${palette}
+Body: ${bodyVariant} / ${bodyEdge}
+Face Placement: ${facePlacement}
 
-  const grid = document.getElementById("monsterGrid");
-  grid.innerHTML = rows.map(([label, value]) => `
-    <div class="row">
-      <div class="label">${label}</div>
-      <div class="value">${value}</div>
-    </div>
-  `).join("");
+Eyes: ${eyes} (${eyeTone})
+Brows: ${brows}${eleven==="Yes"?" + eleven lines":""}
+Nose: ${nose}
+Mouth: ${mouth}
 
-  const summary = [
-    `Palette: ${mon.paletteName}`,
-    `Background: ${mon.background}`,
-    `Body: ${mon.body} (${mon.bodyVariantDetail})`,
-    `Body Edge: ${mon.bodyEdge}`,
-    `Face Placement: ${mon.facePlacement}`,
-    `Eyes: ${mon.eyeType} · ${mon.eyeTone} tone`,
-    `Eyebrows: ${mon.browType} · ${mon.browColor}`,
-    `Nose: ${mon.noseType} · ${mon.noseColor}`,
-    `Mouth: ${mon.mouth}${mon.lipsColor ? ` · lips ${mon.lipsColor}` : ""}`,
-    `Teeth: ${mon.teeth}${mon.teethModifier !== "None" ? ` · ${mon.teethModifier}` : ""}`,
-    `Tongue: ${mon.tongue}${mon.tongueColor ? ` · ${mon.tongueColor}` : ""}`,
-    `Cheek Area: ${mon.cheeks}`,
-    `Horns: ${mon.horns}${mon.hornColor ? ` · ${mon.hornColor}` : ""}`,
-    `Tail: ${mon.tail ? mon.tail + " · " + mon.tailColor : "None"}`,
-    `Wings: ${mon.wings ? mon.wings + " · " + mon.wingColor : "None"}`,
-    `Head Accessory: ${mon.headAccessory === "None" ? "None" : mon.headAccessory + (mon.headMetallic !== "None" ? " · " + mon.headMetallic : "") + (mon.headAccessoryColor ? " · " + mon.headAccessoryColor : "")}`,
-    `Face Accessory: ${mon.faceAccessory === "None" ? "None" : mon.faceAccessory + (mon.faceAccessoryColor ? " · " + mon.faceAccessoryColor : "")}`
-  ].join("\n");
+Teeth: ${teeth}${teethMod!=="None"?" + "+teethMod:""}
+Tongue: ${tongue}
+Cheeks: ${cheeks}
 
-  document.getElementById("summaryBox").textContent = summary;
-  window.currentSummary = summary;
+Horns: ${horns}
+
+Tail/Wings:
+${tailMode==="None"?"None":
+tailMode==="Tail"?tail:
+tailMode==="Wings"?wings:
+tail+" + "+wings}
+
+Head: ${head}
+Face: ${faceAcc}${goldMono==="Yes"?" + Gold Monocle":""}
+`;
 }
-
-document.getElementById("generateBtn").addEventListener("click", () => {
-  renderMonster(generateMonster());
-});
-
-document.getElementById("copyBtn").addEventListener("click", async () => {
-  const text = window.currentSummary || "";
-  try {
-    await navigator.clipboard.writeText(text);
-    alert("Summary copied.");
-  } catch (e) {
-    alert("Could not copy automatically on this device.");
-  }
-});
-
-renderMonster(generateMonster());
 </script>
+
 </body>
 </html>
