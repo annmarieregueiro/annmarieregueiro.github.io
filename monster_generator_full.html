@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monster Generator</title>
+<style>
+body { font-family: -apple-system, sans-serif; padding:20px; background:#f5f5f7; }
+button { padding:16px; font-size:20px; margin:10px 0; border-radius:14px; border:none; background:#111; color:white; }
+pre { white-space:pre-wrap; background:#fff; padding:16px; border-radius:14px; }
+</style>
+</head>
+<body>
+
+<h1>Monster Generator</h1>
+<button onclick="generate()">Generate Monster</button>
+
+<pre id="output"></pre>
+
+<script>
+function wPick(list){
+  let total = list.reduce((a,b)=>a+b[1],0);
+  let r = Math.random()*total;
+  for(let i=0;i<list.length;i++){
+    if((r-=list[i][1])<0) return list[i][0];
+  }
+}
+
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function generate(){
+
+// Twins / Triplets
+let twins = Math.random() < 0.02;
+let triplets = !twins && Math.random() < 0.01;
+
+// Core
+let palette = wPick([
+["Sunset",10],["Slime",10],["Dream",10],["Mint",10],
+["Candy",8],["Sorbet",8],["Cotton Candy",8],["Frost",8],["Pastel",8],
+["Ocean",6],["Sky",6],["Garden",6],["Retro",6],["Vintage",6],
+["Berry",4],["Fireball",4],["Highlighter",4],["Bruise",4],
+["Electric",2],["Toxic",2],["Lava",2],["Goth",2]
+]);
+
+let bodyEdge = wPick([
+["Straight edges",12],["Wavy edges",10],["Scalloped edges",7],["Zig zag edges",5]
+]);
+
+let bodyVariant = wPick([
+["Solid",62],["Ombre",26],["Speckled",12]
+]);
+
+let facePlacement = wPick([["High",8],["Low",3]]);
+
+// Face
+let eyes = wPick([
+["Normal",15],["Angry",15],["Bored",10],["Shifty",10],
+["Dots",6],["Sad",6],["Cyclops",3],["3 Eyes",1]
+]);
+
+let eyeTone = wPick([["Normal",15],["Dark",8],["Light",4]]);
+
+let brows = wPick([
+["Normal straight",15],["Normal fluffy",14],["Angry straight",10],["Worried straight",10],
+["Straight unibrow",8],["Fluffy unibrow",7],
+["Angry fluffy",5],["Worried fluffy",5],
+["None",3],["Ridge",3]
+]);
+
+let eleven = ["Angry fluffy","Normal fluffy","Worried fluffy"].includes(brows)
+  ? (Math.random()<0.1?"Yes":"No")
+  : "No";
+
+let nose = Math.random()<0.5 ? "Short" : "Long";
+
+let mouth = wPick([
+["Normal no lips",14],["Normal lips",14],["Smile no lips",10],["Smile lips",10],
+["Frown no lips",6],["Frown lips",6],["Surprised",3]
+]);
+
+// Teeth
+let teeth = wPick([
+["No teeth",14],["Underbite",12],["Overbite",12],
+["Single down",8],["Single up",8],
+["Buck teeth",7],["Fangs down",5],["Fangs up",5]
+]);
+
+let teethMod = "None";
+if(teeth !== "No teeth"){
+  if(teeth==="Underbite"||teeth==="Overbite"){
+    teethMod = wPick([["None",20],["Silver",3],["Gold",2],["Rainbow",1]]);
+  }else{
+    teethMod = wPick([["None",20],["Silver",3],["Gold",2]]);
+  }
+}
+
+// Tongue
+let tongue = "No tongue";
+if(Math.random()<0.4){
+  let valid = [];
+  let all = ["Centre","Side","Lick","Fork Centre","Fork Side"];
+
+  for(let t of all){
+    let ok = true;
+
+    if(["Underbite","Overbite","Buck teeth"].includes(teeth)) ok=false;
+    if(teeth==="Fangs down" && (t==="Side"||t==="Fork Side")) ok=false;
+    if(teeth==="Fangs up" && (t==="Side"||t==="Fork Side")) ok=false;
+    if(teeth==="Single up" && t==="Lick") ok=false;
+
+    if(ok) valid.push(t);
+  }
+
+  if(valid.length>0) tongue = pick(valid);
+}
+
+// Cheeks
+let cheeks = wPick([
+["Neutral",15],["Eye bags",10],["Puffy cheeks",10],["Freckles",5]
+]);
+
+// Horns
+let horns = wPick([
+["None",15],["Nubs",10],["Straight",10],["Curled in",6],["Curled out",6],["Antlers",3]
+]);
+
+// Tail / Wings
+let tailMode = wPick([
+["None",70],["Tail",20],["Wings",8],["Both",2]
+]);
+
+let tail = "None";
+let wings = "None";
+
+if(tailMode==="Tail"||tailMode==="Both"){
+  tail = pick(["Round","Fluffy","Curled","Arrow"]);
+}
+if(tailMode==="Wings"||tailMode==="Both"){
+  wings = pick(["Angel","Bat","Demon"]);
+}
+
+// Head
+let head = pick(["None","Antenna","Star","Cat","Bunny","Party","Crown","Arrow","Tiny","Beret","Bow","Halo","Witch"]);
+
+if(["Curled in","Curled out","Antlers"].includes(horns)){
+  if(["Antenna","Star","Tiny","Bow","Witch","Party"].includes(head)) head="None";
+}
+if(horns!=="None" && ["Cat","Beret","Bunny"].includes(head)) head="None";
+
+// Face Accessories
+let faceAcc = pick([
+"None","Bandage","Stitches","Drool","Eyelashes","Round glasses",
+"Wayfarer glasses","Wayfarer sunglasses","Sweat drop",
+"Heart sunglasses","Eyepatch","Monocle",
+"Circle hole","Heart hole","Star hole","Moustache"
+]);
+
+if(tongue!=="No tongue" && faceAcc==="Drool") faceAcc="None";
+if(facePlacement==="Low" && ["Circle hole","Heart hole","Star hole"].includes(faceAcc)) faceAcc="None";
+if(facePlacement==="High" && faceAcc==="Sweat drop") faceAcc="None";
+
+if(faceAcc==="Moustache" && Math.random()<0.2){
+  faceAcc="Moustache + Monocle";
+}
+
+// Gold monocle
+let goldMono = "No";
+if((faceAcc==="Monocle" || faceAcc==="Moustache + Monocle") &&
+   (faceAcc==="Moustache + Monocle" || head==="Crown")){
+  if(Math.random()<0.05) goldMono="Yes";
+}
+
+// Output
+document.getElementById("output").textContent = `
+Twins: ${twins?"Yes":"No"}
+Triplets: ${triplets?"Yes":"No"}
+
+Palette: ${palette}
+Body: ${bodyVariant} / ${bodyEdge}
+Face Placement: ${facePlacement}
+
+Eyes: ${eyes} (${eyeTone})
+Brows: ${brows}${eleven==="Yes"?" + eleven lines":""}
+Nose: ${nose}
+Mouth: ${mouth}
+
+Teeth: ${teeth}${teethMod!=="None"?" + "+teethMod:""}
+Tongue: ${tongue}
+Cheeks: ${cheeks}
+
+Horns: ${horns}
+
+Tail/Wings:
+${tailMode==="None"?"None":
+tailMode==="Tail"?tail:
+tailMode==="Wings"?wings:
+tail+" + "+wings}
+
+Head: ${head}
+Face: ${faceAcc}${goldMono==="Yes"?" + Gold Monocle":""}
+`;
+}
+</script>
+
+</body>
+</html>
