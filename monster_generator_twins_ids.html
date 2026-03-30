@@ -1,0 +1,379 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Monster Generator</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f7;margin:0;padding:20px;color:#111}
+  .wrap{max-width:980px;margin:0 auto}
+  .card{background:#fff;border-radius:20px;padding:22px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}
+  h1{margin:0 0 10px;font-size:28px}
+  p{margin:0 0 16px;color:#666}
+  button{appearance:none;border:none;background:#111;color:#fff;font-size:20px;font-weight:700;padding:16px 22px;border-radius:16px;cursor:pointer;margin-right:10px;margin-bottom:10px}
+  button.secondary{background:#e7e7ea;color:#111}
+  pre{white-space:pre-wrap;background:#fafafa;border:1px solid #ddd;border-radius:16px;padding:14px;font-size:16px;line-height:1.45;margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Monster Generator</h1>
+    <p>Full rules version with twins/triplets logic and deterministic IDs.</p>
+    <button onclick="generate()">Generate Monster</button>
+    <button class="secondary" onclick="copySummary()">Copy Summary</button>
+  </div>
+  <div class="card">
+    <pre id="output">Tap Generate Monster.</pre>
+  </div>
+</div>
+
+<script>
+function wPick(list){
+  const total = list.reduce((sum, item) => sum + item[1], 0);
+  let r = Math.random() * total;
+  for (const [value, weight] of list){
+    r -= weight;
+    if (r <= 0) return value;
+  }
+  return list[list.length-1][0];
+}
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function sampleDistinct(arr, count){
+  const pool = [...arr];
+  const out = [];
+  for(let i=0;i<count && pool.length;i++){
+    const idx = Math.floor(Math.random()*pool.length);
+    out.push(pool.splice(idx,1)[0]);
+  }
+  return out;
+}
+function reroll(generatorFn, validFn, max=500){
+  for(let i=0;i<max;i++){
+    const value = generatorFn();
+    if(validFn(value)) return value;
+  }
+  throw new Error("Could not find valid result after rerolls.");
+}
+function hashString(str){
+  let hash = 2166136261;
+  for(let i=0;i<str.length;i++){
+    hash ^= str.charCodeAt(i);
+    hash += (hash<<1) + (hash<<4) + (hash<<7) + (hash<<8) + (hash<<24);
+  }
+  return (hash >>> 0).toString(36).toUpperCase();
+}
+function stableID(mon){
+  const core = [
+    mon.palette, mon.bodyVariant, mon.bodyEdge, mon.facePlacement,
+    mon.eyes, mon.eyeTone, mon.brows, mon.elevenLines,
+    mon.nose, mon.mouth, mon.teeth, mon.teethModifier,
+    mon.tongue, mon.cheeks, mon.horns, mon.tailDisplay,
+    mon.headAccessory, mon.headMetal, mon.faceAccessory, mon.goldMonocle,
+    mon.twinsFlag, mon.tripletsFlag
+  ].join("|");
+  return "MON-" + hashString(core).slice(0,8);
+}
+function familyID(base, type){
+  const core = [
+    type, base.palette, base.bodyVariant, base.bodyEdge, base.facePlacement
+  ].join("|");
+  return (type === "triplets" ? "TRIP-" : "TWIN-") + hashString(core).slice(0,8);
+}
+
+function teethModifierFor(teeth){
+  if (teeth === "No teeth") return "None";
+  if (teeth === "Underbite" || teeth === "Overbite"){
+    return wPick([["None",60],["Silver teeth",1.5],["Gold teeth",0.7],["Rainbow teeth",0.35]]);
+  }
+  return wPick([["None",60],["Silver teeth",1.5],["Gold teeth",0.7]]);
+}
+function validTonguesForTeeth(teeth){
+  const options = [
+    "Round tongue going down the centre",
+    "Round tongue going down the side",
+    "Round tongue licking up",
+    "Forked tongue center",
+    "Forked tongue going down the side"
+  ];
+  return options.filter(t => {
+    if (t === "Round tongue going down the centre") {
+      return !["Underbite","Overbite","Buck teeth"].includes(teeth);
+    }
+    if (t === "Round tongue going down the side") {
+      return !["Underbite","Overbite","Fangs going down","Fangs going up","Buck teeth"].includes(teeth);
+    }
+    if (t === "Round tongue licking up") {
+      return !["Underbite","Overbite","Fangs going down","Fangs going up","A single tooth going up","Buck teeth"].includes(teeth);
+    }
+    if (t === "Forked tongue center") {
+      return !["Underbite","Overbite","Buck teeth"].includes(teeth);
+    }
+    if (t === "Forked tongue going down the side") {
+      return !["Underbite","Overbite","Fangs going down","Fangs going up","Buck teeth"].includes(teeth);
+    }
+    return true;
+  });
+}
+function tongueForTeeth(teeth){
+  const valid = validTonguesForTeeth(teeth);
+  if (!valid.length) return "No tongue";
+  return wPick(valid.map(t => {
+    if (t === "Round tongue going down the centre") return [t,15];
+    if (t === "Round tongue going down the side") return [t,15];
+    if (t === "Round tongue licking up") return [t,8];
+    if (t === "Forked tongue center") return [t,4];
+    return [t,2];
+  }));
+}
+function headOptionsForHorns(h){
+  const opts = [];
+  const add = (name, wt) => opts.push([name, wt]);
+  add("None", 20);
+  if (!["Curled in","Curled out","Antlers"].includes(h)) {
+    add("Antenna headband",10); add("Star headband",10); add("Party hat",10);
+    add("Tiny hat",10); add("Hair bow",10); add("Witch hat",6);
+  }
+  if (h === "No horns") {
+    add("Cat ears",6); add("Bunny ears",5); add("Beret",6);
+  }
+  if (h === "Small nubs") add("Bunny ears",5);
+  add("Crown",3); add("Arrow through head",2); add("Halo",3);
+  return opts;
+}
+function headMetalForAccessory(headAccessory){
+  if (headAccessory === "Crown") return wPick([["None",40],["Gold",1]]);
+  if (headAccessory === "Halo") return wPick([["None",40],["Gold",1]]);
+  if (headAccessory === "Star headband") return wPick([["None",40],["Silver",1.6],["Gold",0.8]]);
+  if (headAccessory === "Antenna headband") return wPick([["None",40],["Silver",1.6],["Gold",0.8]]);
+  if (headAccessory === "Arrow through head") return wPick([["None",40],["Silver",1.6],["Gold",0.8]]);
+  return "None";
+}
+function faceAccessoryOptions(ctx){
+  const opts = [];
+  const add = (name, wt) => opts.push([name, wt]);
+  add("None",20);
+  add("Bandage",10);
+  add("Stitches",10);
+  if (ctx.tongue === "No tongue") add("Drool",10);
+  add("Eyelashes",7);
+  add("Round glasses",7);
+  add("Wayfarer glasses",7);
+  add("Wayfarer sunglasses",4);
+  if (ctx.facePlacement === "Low") add("Sweat drop",4);
+  add("Heart sunglasses",2);
+  add("Eyepatch",2);
+  add("Monocle",2);
+  if (ctx.facePlacement === "High") {
+    add("Circle hole in body",2);
+    add("Heart hole in body",1);
+    add("Star hole in body",0.5);
+  }
+  add("Moustache",1.2);
+  add("Moustache + Monocle",0.25);
+  return opts;
+}
+function createMonster(baseShared, flags){
+  const mon = {};
+  mon.twinsFlag = flags && flags.twins ? "Yes" : "No";
+  mon.tripletsFlag = flags && flags.triplets ? "Yes" : "No";
+
+  if (baseShared){
+    mon.palette = baseShared.palette;
+    mon.bodyEdge = baseShared.bodyEdge;
+    mon.bodyVariant = baseShared.bodyVariant;
+    mon.facePlacement = baseShared.facePlacement;
+  } else {
+    mon.palette = wPick([
+      ["Sunset",10],["Slime",10],["Dream",10],["Mint",10],
+      ["Candy",8],["Sorbet",8],["Cotton Candy",8],["Frost",8],["Pastel",8],
+      ["Ocean",6],["Sky",6],["Garden",6],["Retro",6],["Vintage",6],
+      ["Berry",4],["Fireball",4],["Highlighter",4],["Bruise",4],
+      ["Electric",2],["Toxic",2],["Lava",2],["Goth",2]
+    ]);
+    mon.bodyEdge = wPick([["Straight edges",12],["Wavy edges",10],["Scalloped edges",7],["Zig zag edges",5]]);
+    mon.bodyVariant = wPick([["Solid",62],["Ombre",26],["Variant B / Speckled",12]]);
+    mon.facePlacement = wPick([["High",8],["Low",3]]);
+  }
+
+  mon.eyes = wPick([
+    ["Normal",15],["Angry",15],["Bored",10],["Shifty",10],
+    ["Dots",6],["Sad",6],["1 eye (cyclops)",3],["3 Eyes",1]
+  ]);
+  mon.eyeTone = wPick([["Normal",15],["Dark",8],["Light",4]]);
+
+  mon.brows = reroll(
+    () => wPick([
+      ["Normal straight brow",15],["Normal fluffy brow",14],["Angry straight brow",10],["Worried straight brow",10],
+      ["Straight unibrow",8],["Fluffy unibrow",7],["Angry fluffy brow",5],["Worried fluffy brow",5],
+      ["None",3],["Just a brow ridge / fold",3]
+    ]),
+    b => !(mon.eyes === "Angry" && (b === "Worried straight brow" || b === "Worried fluffy brow"))
+  );
+  mon.elevenLines = ["Angry fluffy brow","Normal fluffy brow","Worried fluffy brow"].includes(mon.brows)
+    ? wPick([["No",10],["Yes",1]])
+    : "No";
+
+  mon.nose = Math.random() < 0.5 ? "Short nose" : "Long nose";
+  mon.mouth = wPick([
+    ["Normal no lips",14],["Normal lips",14],["Smile no lips",10],["Smile lips",10],
+    ["Frown no lips",6],["Frown lips",6],["Surprised",3]
+  ]);
+
+  mon.teeth = wPick([
+    ["No teeth",14],["Underbite",12],["Overbite",12],["A single tooth going down",8],
+    ["A single tooth going up",8],["Buck teeth",7],["Fangs going down",5],["Fangs going up",5]
+  ]);
+  mon.teethModifier = teethModifierFor(mon.teeth);
+
+  mon.tongue = "No tongue";
+  if (Math.random() < 0.40){
+    const options = validTonguesForTeeth(mon.teeth);
+    if (options.length) mon.tongue = tongueForTeeth(mon.teeth);
+  }
+
+  mon.cheeks = wPick([["Neutral",15],["Eye bags",10],["Puffy cheeks",10],["Freckles",5]]);
+  mon.horns = wPick([["No horns",15],["Small nubs",10],["Straight and pointy",10],["Curled in",6],["Curled out",6],["Antlers",3]]);
+
+  const activeCount = wPick([[0,52],[1,30],[2,14],[3,4]]);
+  const activeCategories = sampleDistinct(["head","face","tail"], activeCount);
+
+  mon.tailMode = "No tail or wings";
+  mon.tail = "None";
+  mon.wings = "None";
+  if (activeCategories.includes("tail")) {
+    mon.tailMode = wPick([["Tail only",20],["Wings only",8],["Both",2]]);
+    if (mon.tailMode === "Tail only" || mon.tailMode === "Both"){
+      mon.tail = wPick([["Round tail",10],["Fluffy tail",10],["Curled tail",10],["Arrow tail",10]]);
+    }
+    if (mon.tailMode === "Wings only" || mon.tailMode === "Both"){
+      mon.wings = wPick([["Angel wings",6],["Bat wings",6],["Demon wings",6]]);
+    }
+  }
+  mon.tailDisplay =
+    mon.tailMode === "No tail or wings" ? "No tail or wings" :
+    mon.tailMode === "Tail only" ? mon.tail :
+    mon.tailMode === "Wings only" ? mon.wings :
+    mon.tail + " + " + mon.wings;
+
+  mon.headAccessory = "None";
+  mon.headMetal = "None";
+  if (activeCategories.includes("head")){
+    mon.headAccessory = reroll(
+      () => wPick(headOptionsForHorns(mon.horns).filter(([name]) => name !== "None")),
+      x => x !== "None"
+    );
+    mon.headMetal = headMetalForAccessory(mon.headAccessory);
+  }
+
+  mon.faceAccessory = "None";
+  mon.goldMonocle = "No";
+  if (activeCategories.includes("face")){
+    mon.faceAccessory = reroll(
+      () => wPick(faceAccessoryOptions({facePlacement: mon.facePlacement, tongue: mon.tongue}).filter(([name]) => name !== "None")),
+      x => x !== "None"
+    );
+    if (
+      (mon.faceAccessory === "Monocle" || mon.faceAccessory === "Moustache + Monocle") &&
+      (mon.faceAccessory === "Moustache + Monocle" || (mon.headAccessory === "Crown" && mon.headMetal === "Gold"))
+    ) {
+      mon.goldMonocle = wPick([["No",25],["Yes",1]]);
+    }
+  }
+  return mon;
+}
+
+function mutationDistance(a, b){
+  let changes = 0;
+  if (a.eyes !== b.eyes) changes++;
+  if (a.eyeTone !== b.eyeTone) changes++;
+  if (a.brows !== b.brows || a.elevenLines !== b.elevenLines) changes++;
+  if (a.nose !== b.nose) changes++;
+  if (a.mouth !== b.mouth) changes++;
+  if (a.teeth !== b.teeth || a.teethModifier !== b.teethModifier) changes++;
+  if (a.tongue !== b.tongue) changes++;
+  if (a.cheeks !== b.cheeks) changes++;
+  if (a.horns !== b.horns) changes++;
+  if (a.tailDisplay !== b.tailDisplay) changes++;
+  if (a.headAccessory !== b.headAccessory || a.headMetal !== b.headMetal) changes++;
+  if (a.faceAccessory !== b.faceAccessory || a.goldMonocle !== b.goldMonocle) changes++;
+  return changes;
+}
+
+function mutateMonsterFromBase(base, minChanges, maxChanges, flags){
+  let mon = null;
+  for(let tries=0; tries<400; tries++){
+    mon = createMonster({
+      palette: base.palette,
+      bodyEdge: base.bodyEdge,
+      bodyVariant: base.bodyVariant,
+      facePlacement: base.facePlacement
+    }, flags);
+    const changes = mutationDistance(base, mon);
+    if (changes >= minChanges && changes <= maxChanges) return mon;
+  }
+  return mon;
+}
+
+function formatMonster(mon, label, family=null, suffix=""){
+  const id = family ? `${family}-${suffix}` : stableID(mon);
+  return `${label}
+ID: ${id}${family ? "\nFamily ID: " + family : ""}
+
+Palette: ${mon.palette}
+Body: ${mon.bodyVariant} / ${mon.bodyEdge}
+Face Placement: ${mon.facePlacement}
+
+Eyes: ${mon.eyes} (${mon.eyeTone})
+Brows: ${mon.brows}${mon.elevenLines === "Yes" ? " + eleven lines" : ""}
+Nose: ${mon.nose}
+Mouth: ${mon.mouth}
+
+Teeth: ${mon.teeth}${mon.teethModifier !== "None" ? " + " + mon.teethModifier : ""}
+Tongue: ${mon.tongue}
+Cheeks: ${mon.cheeks}
+
+Horns: ${mon.horns}
+Tail / Wings: ${mon.tailDisplay}
+Head Accessory: ${mon.headAccessory}${mon.headMetal !== "None" ? " (" + mon.headMetal + ")" : ""}
+Face Accessory: ${mon.faceAccessory}${mon.goldMonocle === "Yes" ? " + Gold Monocle" : ""}`.trim();
+}
+
+function generate(){
+  const twins = Math.random() < 0.02;
+  const triplets = !twins && Math.random() < 0.01;
+
+  let blocks = [];
+  if (triplets){
+    const base = createMonster(null, {twins:false, triplets:true});
+    const fam = familyID(base, "triplets");
+    const a = mutateMonsterFromBase(base, 1, 2, {twins:false, triplets:true});
+    const b = mutateMonsterFromBase(base, 1, 2, {twins:false, triplets:true});
+    const c = mutateMonsterFromBase(base, 1, 2, {twins:false, triplets:true});
+    blocks.push(`Twins: No\nTriplets: Yes`);
+    blocks.push(formatMonster(a, "Triplet A", fam, "A"));
+    blocks.push(formatMonster(b, "Triplet B", fam, "B"));
+    blocks.push(formatMonster(c, "Triplet C", fam, "C"));
+  } else if (twins){
+    const base = createMonster(null, {twins:true, triplets:false});
+    const fam = familyID(base, "twins");
+    const a = mutateMonsterFromBase(base, 1, 3, {twins:true, triplets:false});
+    const b = mutateMonsterFromBase(base, 1, 3, {twins:true, triplets:false});
+    blocks.push(`Twins: Yes\nTriplets: No`);
+    blocks.push(formatMonster(a, "Twin A", fam, "A"));
+    blocks.push(formatMonster(b, "Twin B", fam, "B"));
+  } else {
+    const mon = createMonster(null, {twins:false, triplets:false});
+    blocks.push(`Twins: No\nTriplets: No`);
+    blocks.push(formatMonster(mon, "Monster"));
+  }
+
+  document.getElementById("output").textContent = blocks.join("\n\n————————————\n\n");
+}
+function copySummary(){
+  navigator.clipboard.writeText(document.getElementById("output").textContent || "");
+}
+</script>
+</body>
+</html>
